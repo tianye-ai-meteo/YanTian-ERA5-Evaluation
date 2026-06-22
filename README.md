@@ -1,8 +1,9 @@
 # YanTian ERA5 Evaluation
 
-This repository contains a 1-degree ERA5 evaluation workflow for the YanTian
+This repository contains a 1-degree ERA5 evaluation workflow for the YanTian v1
 forecast model, plus the training code used for 1-degree pretraining and
-multi-day autoregressive fine-tuning.
+multi-day autoregressive fine-tuning. The repository is intended to support
+open, reusable, and reproducible model evaluation.
 
 The default evaluation runs the forecast model from `2020-01-01 00:00` to
 `2020-01-04 00:00` and reports global latitude-weighted RMSE for `Z500`,
@@ -18,6 +19,13 @@ The default evaluation runs the forecast model from `2020-01-01 00:00` to
 
 Large model files, ERA5 data, checkpoints, logs, and prediction outputs are not
 tracked by Git.
+
+## License and Citation
+
+This software is released under the MIT License. See `LICENSE`.
+
+If you use this repository, cite the related paper and repository metadata in
+`CITATION.cff`.
 
 ## Project Layout
 
@@ -48,6 +56,8 @@ Download the forecast ONNX files and place them in the repository root:
 | `YanTian_forecast.data` | Same cloud drive |
 
 The downscaler is not used in this repository.
+
+See `DATA_AVAILABILITY.md` for a consolidated data availability statement.
 
 ## ERA5 Evaluation Data
 
@@ -105,38 +115,62 @@ Default RMSE channels:
 
 ## Environment
 
-Create the base environment:
+Create the base environment with conda:
 
 ```bash
 conda env create -f environment.txt
 conda activate yantian-era5
 ```
 
-For training, install PyTorch with the CUDA build matching your machine, then
-install the remaining Python packages:
+Alternatively, install the Python package dependencies with pip:
 
 ```bash
-pip install timm einops matplotlib xarray netCDF4
+python -m pip install -r requirements.txt
 ```
 
-## Validate Evaluation Data
+For training, install PyTorch with the CUDA build matching your machine before
+launching DDP training jobs.
+
+## Tests Without Large External Files
+
+Run the lightweight unit tests:
 
 ```bash
-python prepare_data.py
-python inference.py --check-data-only
+python -m pytest tests
 ```
 
-## Run Evaluation
+These tests check date-step calculation, RMSE logic, and data-file validation
+without requiring model weights or ERA5 files.
+
+## Reproducibility Quick Start
+
+After installing dependencies and downloading the external model/data files,
+run:
 
 ```bash
+python scripts/check_installation.py
 python inference.py
 ```
 
-Outputs:
+To include training/preprocessing dependencies in the check:
+
+```bash
+python scripts/check_installation.py --include-training
+```
+
+This should create:
 
 ```text
 predict/forecast_2020010100_to_2020010400_1deg.npy
 predict/rmse_2020010100_to_2020010400_1deg.json
+```
+
+To check file availability without loading the ONNX model:
+
+```bash
+python prepare_data.py
+python inference.py --check-data-only
+python scripts/check_installation.py --skip-onnx-load
 ```
 
 Validated default-run RMSE:
@@ -149,6 +183,16 @@ Validated default-run RMSE:
 | `U10` | `1.571451` |
 | `V10` | `1.611979` |
 | `MSLP` | `161.366700` |
+
+## Run a Different Evaluation
+
+```bash
+python inference.py \
+  --start-time 2020010100 \
+  --target-time 2020010400 \
+  --data-dir data/era5_1deg \
+  --output-dir predict
+```
 
 ## Training Data Preparation
 
@@ -227,10 +271,10 @@ Useful environment overrides:
 ## Citation
 
 ```bibtex
-@article{li2025searth,
+@misc{li2025searth,
   title={Searth Transformer: A Transformer Architecture Incorporating Earth's Geospheric Physical Priors for Global Mid-Range Weather Forecasting},
   author={Li, Tianye and others},
-  journal={arXiv preprint arXiv:2601.09467},
+  note={arXiv preprint arXiv:2601.09467},
   year={2025}
 }
 ```

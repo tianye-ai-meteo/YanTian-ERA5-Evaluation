@@ -21,4 +21,4 @@
 ## Pending
 
 - Create the remote repository under `tianye-ai-meteo`.
-- Push local `main` after final review and repository name confirmation.
+- Push local `main` after final checks and repository name confirmation.

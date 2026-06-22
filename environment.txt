@@ -13,3 +13,4 @@ dependencies:
   - pip:
       - timm
       - einops
+      - pytest

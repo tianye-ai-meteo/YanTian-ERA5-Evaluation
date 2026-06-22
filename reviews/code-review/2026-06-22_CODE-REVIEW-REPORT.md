@@ -46,4 +46,4 @@ Additional smoke checks:
 
 ## Verdict
 
-Ship with notes. The repository is ready for local review and remote creation after the repository name is confirmed.
+Ship with notes. The repository is ready for local checks and remote creation after the repository name is confirmed.
