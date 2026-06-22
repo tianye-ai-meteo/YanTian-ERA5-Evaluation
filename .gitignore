@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Large model/data artifacts are distributed outside GitHub.
+*.onnx
+*.onnx.data
+*.data
+data/
+predict/
