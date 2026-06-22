@@ -8,3 +8,12 @@ __pycache__/
 *.data
 data/
 predict/
+
+# Training outputs.
+training/**/model_saved/
+training/**/rmse_picture/
+training/**/*.log
+training/**/nohup*.log
+training/**/*.pt
+training/**/*.pth
+training/**/*.ckpt

@@ -6,3 +6,10 @@ dependencies:
   - python=3.10
   - numpy
   - onnxruntime
+  - xarray
+  - netcdf4
+  - matplotlib
+  - pip
+  - pip:
+      - timm
+      - einops
