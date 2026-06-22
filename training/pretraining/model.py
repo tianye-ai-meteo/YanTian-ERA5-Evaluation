@@ -126,7 +126,7 @@ class WindowAttention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
         self.softmax = nn.Softmax(dim=-1)
-        self.max_logit_scale = torch.log(torch.tensor(1. / 0.01))  # 在__init__中计算
+        self.max_logit_scale = torch.log(torch.tensor(1. / 0.01))  
 
     def forward(self, x, mask=None):
         """
@@ -170,7 +170,7 @@ class WindowAttention(nn.Module):
         return x
 
     def extra_repr(self) -> str:
-        return f'dim={self.dim}, window_size={self.window_size}, ' \
+        return f'dim={self.dim}, window_size={self.window_size}, '\
                f'pretrained_window_size={self.pretrained_window_size}, num_heads={self.num_heads}'
 
     def flops(self, N):
@@ -275,60 +275,47 @@ class SwinTransformerBlock(nn.Module):
         return x
        
 class PatchMerging(nn.Module):
-    """
-    Patch Merging Layer.
-    将输入特征图的空间维度减半，通道维度调整为 out_dim。
-
-    参数:
-        input_resolution (tuple[int]): 输入特征图的分辨率 (H, W).
-        in_dim (int): 输入特征图的通道数.
-        out_dim (int): 输出特征图的通道数.
-        norm_layer (nn.Module, optional): 归一化层. 默认: nn.LayerNorm
-    """
-    # 修改 __init__ 参数，接收 in_dim 和 out_dim
+    """Downsample patch tokens by merging each 2x2 neighborhood."""
+    
     def __init__(self, input_resolution, in_dim, out_dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.input_resolution = input_resolution # (H, W)
-        self.in_dim = in_dim   # 输入通道 C
-        self.out_dim = out_dim # 输出通道 C_out
-        # 线性层，将 4*C 降维到 C_out
+        self.in_dim = in_dim   
+        self.out_dim = out_dim 
+        
         self.reduction = nn.Linear(4 * in_dim, out_dim, bias=False)
-        # 归一化层作用于合并后的 4*C 特征
+        
         self.norm = norm_layer(out_dim)
 
     def forward(self, x):
-        """
-        前向传播函数.
-        输入 x 的形状: (B, H*W, C_in)
-        输出 x 的形状: (B, H/2*W/2, C_out)
-        """
+        """Merge spatially adjacent tokens and project channel dimensions."""
         H, W = self.input_resolution
         B, L, C = x.shape
-        # assert L == H * W, "输入特征图的长度与分辨率不匹配"
-        # assert C == self.in_dim, f"输入通道数 {C} 与期望的 in_dim {self.in_dim} 不匹配"
-        # assert H % 2 == 0 and W % 2 == 0, f"输入分辨率 ({H}*{W}) 不是偶数."
+        
+        
+        
 
-        # 将输入 reshape 为 (B, H, W, C_in)
+        
         x = x.view(B, H, W, C)
 
-        # 从输入的四个角落采样，实现空间降采样
-        # x0: 左上角 (B, H/2, W/2, C_in)
+        
+        
         x0 = x[:, 0::2, 0::2, :]
-        # x1: 左下角 (B, H/2, W/2, C_in)
+        
         x1 = x[:, 1::2, 0::2, :]
-        # x2: 右上角 (B, H/2, W/2, C_in)
+        
         x2 = x[:, 0::2, 1::2, :]
-        # x3: 右下角 (B, H/2, W/2, C_in)
+        
         x3 = x[:, 1::2, 1::2, :]
-        # 将四个角落的特征在通道维度拼接 (B, H/2, W/2, 4*C_in)
+        
         x = torch.cat([x0, x1, x2, x3], -1)
 
-        # 将拼接后的特征展平 (B, H/2*W/2, 4*C_in)
+        
         x = x.view(B, -1, 4 * C)
 
-        # 应用线性降维层 (B, H/2*W/2, C_out)
+        
         x = self.reduction(x)
-        # 归一化
+        
         x = self.norm(x)
 
         return x
@@ -340,39 +327,36 @@ class SiLU(nn.Module):
         return x * torch.sigmoid(x)
 
 class ResidualBlock(nn.Module):
-    """残差块：包含两个3×3卷积层，每个后接GN和SiLU"""
+    """Two-layer convolutional residual block with group normalization."""
     def __init__(self, channels, num_groups=32):
         super(ResidualBlock, self).__init__()
         
-        # 第一个卷积块
+        
         self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         self.gn1 = nn.GroupNorm(num_groups=num_groups, num_channels=channels)
         self.silu1 = SiLU()
         
-        # 第二个卷积块
+        
         self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
         self.gn2 = nn.GroupNorm(num_groups=num_groups, num_channels=channels)
         self.silu2 = SiLU()
         
     def forward(self, x):
-        """
-        输入: x - shape: (B, C, H, W)
-        输出: shape: (B, C, H, W) - 维度不变
-        """
-        # 保存输入用于残差连接
+        """Apply the residual convolutional block."""
+        
         identity = x
         
-        # 第一个卷积块
+        
         out = self.conv1(x)
         out = self.gn1(out)
         out = self.silu1(out)
         
-        # 第二个卷积块
+        
         out = self.conv2(out)
         out = self.gn2(out)
         out = self.silu2(out)
         
-        # 残差连接
+        
         out = out + identity
         
         return out
@@ -411,13 +395,13 @@ class DownSampleBlock(nn.Module):
     def __init__(self, in_channels=69, out_channels=384):
         super().__init__()
         self.conv3d_block = nn.Conv3d(
-                in_channels=in_channels,      # 输入通道数 69
-                out_channels=out_channels, # 中间通道数 512
-                kernel_size=(2, 2, 2), # 卷积核 (D, H, W)
-                stride=(1, 2, 2),             # 步长 (D, H, W)
-                padding=(0, 0, 0))           # 填充 (D, H, W)
+                in_channels=in_channels,      
+                out_channels=out_channels, 
+                kernel_size=(2, 2, 2), 
+                stride=(1, 2, 2),             
+                padding=(0, 0, 0))           
 
-        # 实例归一化 (作用于通道维度 C=512)
+        
         self.layer_norm = nn.LayerNorm(out_channels) 
         self.gelu = nn.GELU()
 
@@ -441,7 +425,7 @@ class DownSampleBlock(nn.Module):
 
 class Encoder_High(nn.Module):
     def __init__(self, 
-                 # transformer参数
+                 
                  depth=2,
                  in_channels=384, 
                  input_resolution=(90, 180),
@@ -449,13 +433,13 @@ class Encoder_High(nn.Module):
                  mlp_ratio=4.,
                  drop=0.1, attn_drop=0.1, drop_path=0.1,
                  norm_layer=nn.LayerNorm,
-                 # patch_merging参数
+                 
                  out_channels=768, 
-                 # 使用checkpoints
+                 
                  use_checkpoints=True,
                  ):
         super().__init__()
-        # 使用transformer进行处理
+        
         self.use_checkpoints = use_checkpoints
         self.blocks = nn.ModuleList([SwinTransformerBlock(
             dim=in_channels, 
@@ -467,7 +451,7 @@ class Encoder_High(nn.Module):
             norm_layer=norm_layer, 
             
             ) for i in range(depth)])
-        # 空间维度减半，通道数加倍。数据维度从(B, 90, 180, C) 处理到 (B, 45, 90, 2C)
+        
         self.patch_merging = PatchMerging(input_resolution=input_resolution, in_dim=in_channels, out_dim=out_channels)
             
     def forward(self, x):
@@ -479,15 +463,15 @@ class Encoder_High(nn.Module):
             else:
                 x = block(x)
         x = x + skip
-        # 下采样
+        
         x = self.patch_merging(x)
 
         return x
 
 class Core(nn.Module):
     def __init__(self, 
-                 # transformer参数
-                 # 常规参数
+                 
+                 
                  depth=30,
                  in_channels=1536, 
                  input_resolution=(45, 90),
@@ -495,7 +479,7 @@ class Core(nn.Module):
                  mlp_ratio=4.,
                  drop=0.1, attn_drop=0.1, drop_path=0.1,
                  norm_layer=nn.LayerNorm,
-                 # 使用checkpoints
+                 
                  use_checkpoints=True,
                  ):
         super().__init__()
@@ -504,7 +488,7 @@ class Core(nn.Module):
         self.use_checkpoints = use_checkpoints
         self.depth = depth
 
-        # 定义指定深度的 Swin Transformer Block
+        
         self.blocks = nn.ModuleList()
         for i in range(depth):
             block_params = {
@@ -512,7 +496,7 @@ class Core(nn.Module):
                 'input_resolution': input_resolution,
                 'num_heads': num_heads,
                 'window_size': window_size,
-                'shift_size': (0, 0) if (i % 2 == 0) else shift_size, # 保持交替移位
+                'shift_size': (0, 0) if (i % 2 == 0) else shift_size, 
                 'mlp_ratio': mlp_ratio,
                 'drop': drop, 'attn_drop': attn_drop, 'drop_path': drop_path,
                 'norm_layer': norm_layer,
@@ -521,14 +505,14 @@ class Core(nn.Module):
             self.blocks.append(SwinTransformerBlock(**block_params))
 
     def forward(self, x):
-        # 确保输入是 (B, L, C)
+        
         B, L, C = x.shape
         H, W = self.input_resolution
-        # assert C == self.dim and L == H * W, f"Core 输入形状错误: 期望 (B, {self.dim}, {H*W}), 得到 {x.shape}"
+        
         skip = x
-        # 应用 Swin Transformer Blocks
+        
         for i, blk in enumerate(self.blocks):
-            # SwinTransformerBlock 期望 (B, L, C) 输入
+            
             if self.use_checkpoints and blk.training:
                 x = checkpoint(blk, x, use_reentrant=False)
             else:
@@ -538,26 +522,26 @@ class Core(nn.Module):
 
 class Decoder_High(nn.Module):
     def __init__(self, 
-                 # 上采样Upsample参数
+                 
                  in_channels=768,
                  out_channels=384,
                  core_resolution=(45, 90),
 
-                 # transformer参数
+                 
                  depth=2, 
                  input_resolution=(90, 180),
                  num_heads=12, window_size=(6, 12), shift_size=(3, 6), # head_dim=32
                  mlp_ratio=4.,
                  drop=0.1, attn_drop=0.1, drop_path=0.1,
                  norm_layer=nn.LayerNorm,
-                 # 使用checkpoints
+                 
                  use_checkpoints=True,
                  ):
         super().__init__()
         self.core_resolution = core_resolution
         self.out_channels = out_channels
         self.use_checkpoints = use_checkpoints
-        # 上采样
+        
         self.patch_expand = PatchExpand(input_resolution=core_resolution, dim=in_channels, norm_layer=norm_layer)
 
         # transformer
@@ -572,7 +556,7 @@ class Decoder_High(nn.Module):
             ) for i in range(depth)])
         
     def forward(self, x):
-        # patch_expand上采样
+        
         x = self.patch_expand(x) # (B, 90*180, 384)
         
         # transformer
@@ -586,11 +570,9 @@ class Decoder_High(nn.Module):
         return x
 
 class UpsampleBlock(nn.Module):
-    '''
-    将0.5度数据上采样两倍变为0.25度数据,变为最终的输出
-    '''
+    """Expand decoder tokens back to the target latitude-longitude grid."""
     def __init__(self, 
-                 # 上采样Upsample参数
+                 
                  in_channels=384, 
                  out_channels=69, 
                  high_resolution=(90, 180),
@@ -600,41 +582,41 @@ class UpsampleBlock(nn.Module):
         super().__init__()
         self.high_resolution = high_resolution
         self.upsample_size = upsample_size
-        # 上采样
+        
         self.patch_expand = PatchExpand(input_resolution=high_resolution, dim=in_channels, norm_layer=norm_layer)
-        # 线性层恢复特征维度
+        
         self.linear = nn.Linear(in_channels//2, out_channels)
     
     def forward(self, x, skip_t0):
         B, _, _ = x.shape
-        # patch_expand上采样
+        
         x = self.patch_expand(x) # (B, 180*360, 192)
         
-        # 线性层恢复特征维度
+        
         x = self.linear(x) # (B, 180*360, 69)
-        # 生成最终输出
+        
         x = x.view(B, 180, 360, 69).permute(0, 3, 1, 2).contiguous() # (B, 69, 180, 360)
         x = x + skip_t0
         return x
 
 class BaselineModel(nn.Module):
     def __init__(self,
-                 # --- 输入数据的原始维度 ---
-                 raw_in_h=180, # 原始输入高度
-                 raw_in_w=360, # 原始输入宽度
-                 raw_in_channels=69, # 原始输入通道数 (垂直层数)
-                 final_out_channels=69, # 最终输出通道数
+                 
+                 raw_in_h=180, 
+                 raw_in_w=360, 
+                 raw_in_channels=69, 
+                 final_out_channels=69, 
 
-                 # --- 各阶段通道数 ---
-                 C0=768, # DownSampleBlock 输出通道, Encoder_High 输入, Decoder_High 输出, UpsampleBlock 输入
-                 C1=1536, # Encoder_High 输出通道, core 输入, Decoder_High 输入
+                 
+                 C0=768, 
+                 C1=1536, 
 
-                 # --- 各模块深度 ---
+                 
                  encoder_high_depth=6,
                  core_depth=20,
                  decoder_high_depth=6,
 
-                 # --- Transformer 公共参数 (可以为每个模块单独设置，这里为简化设为通用或典型值) ---
+                 
                  # Encoder_High (2 degree)
                  eh_num_heads=12, eh_window_size=(6, 12), eh_shift_size=(3, 6), eh_mlp_ratio=4.,
                  # Core (2 degree)
@@ -642,10 +624,10 @@ class BaselineModel(nn.Module):
                  # Decoder_High (2 degree)
                  dh_num_heads=12, dh_window_size=(6, 12), dh_shift_size=(3, 6), dh_mlp_ratio=4.,
 
-                 # --- Dropout 和 DropPath ---
+                 
                  drop_rate=0.05, attn_drop_rate=0.05, drop_path_rate=0.2,
 
-                 # --- Core Checkpoint 参数 ---
+                 
                  high_use_checkpoints=True,
                  core_use_checkpoints=True,
                  ):
@@ -654,7 +636,7 @@ class BaselineModel(nn.Module):
         self.raw_in_h = raw_in_h
         self.raw_in_w = raw_in_w
 
-        # --- 确定各阶段分辨率 ---
+        
         # 2 degree resolution (after DownSampleBlock)
         res_2_h, res_2_w = 90, 180
 
@@ -674,7 +656,7 @@ class BaselineModel(nn.Module):
             window_size=eh_window_size,
             shift_size=eh_shift_size,
             mlp_ratio=eh_mlp_ratio,
-            drop=drop_rate, attn_drop=attn_drop_rate, drop_path=drop_path_rate, # 使用统一的 drop rate
+            drop=drop_rate, attn_drop=attn_drop_rate, drop_path=drop_path_rate, 
             out_channels=C1,
             use_checkpoints=high_use_checkpoints
         )
@@ -696,14 +678,14 @@ class BaselineModel(nn.Module):
         )
 
         # --- 6. Decoder_High ---
-        # 输入: x_dm: (B, res_1_h * res_1_w, C1), shortcut_eh: (B, res_0_5_h * res_0_5_w, C0)
-        # 输出: (B, res_0_5_h * res_0_5_w, C0)
+        
+        
         self.decoder_high = Decoder_High(
-            in_channels=C1, # Core 输出通道
-            out_channels=C0, # Decoder_High 输出通道
+            in_channels=C1, 
+            out_channels=C0, 
             core_resolution=(res_4_h, res_4_w),
             depth=decoder_high_depth,
-            input_resolution=(res_2_h, res_2_w), # Transformer 输入分辨率
+            input_resolution=(res_2_h, res_2_w), 
             num_heads=dh_num_heads,
             window_size=dh_window_size,
             shift_size=dh_shift_size,
@@ -713,28 +695,17 @@ class BaselineModel(nn.Module):
         )
 
         # --- 7. UpsampleBlock ---
-        # 输入: x_dh: (B, res_0_5_h * res_0_5_w, C0), shortcut_ds: (B, res_0_5_h * res_0_5_w, C0)
-        # 输出: (B, final_out_channels, raw_in_h, raw_in_w)
+        
+        
         self.upsample = UpsampleBlock(
-            in_channels=C0, # Decoder_High 输出通道
+            in_channels=C0, 
             out_channels=final_out_channels,
             high_resolution=(res_2_h, res_2_w),
-            upsample_size=(raw_in_h, raw_in_w) # 最终输出分辨率
+            upsample_size=(raw_in_h, raw_in_w) 
         )
 
     def forward(self, x):
-        """
-        定义模型的前向传播逻辑。
-        Args:
-            x (torch.Tensor): 输入张量，形状为 (B, 2, raw_in_channels, raw_in_h, raw_in_w)。
-        Returns:
-            torch.Tensor or tuple:
-                - 如果模型处于评估模式 (eval) 或 Core 未使用 MoE (或 MoE 未返回 l_aux)，
-                  则返回形状为 (B, final_out_channels, raw_in_h, raw_in_w) 的输出张量。
-                - 如果模型处于训练模式 (train) 且 Core 使用了 MoE 并返回了辅助损失 l_aux，
-                  则返回一个元组 (output, l_aux)。
-        """
-        input_dtype = x.dtype # 记录输入数据类型
+        input_dtype = x.dtype 
 
         # 1. DownSampleBlock
         x, shortcut_downsample = self.down_sample(x)
@@ -756,46 +727,46 @@ class BaselineModel(nn.Module):
         x = self.upsample(x, shortcut_downsample)
         # print(f"After Upsample: x={x.shape}")
 
-        # --- 类型检查与转换 ---
+        
         if x.dtype != input_dtype:
              x = x.to(input_dtype)
 
         return x
 
 if __name__ == "__main__":
-    # 定义输入参数
+    
     batch_size = 1
     in_d, in_c, in_h, in_w = 2, 69, 180, 360
-    final_out_channels = 69 # 最终输出通道
+    final_out_channels = 69 
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"使用设备: {device}")
+    print(f"Using device: {device}")
 
-    # 创建一个随机输入张量
+    
     input_tensor = torch.randn(batch_size, in_d, in_c, in_h, in_w)
-    print(f"输入张量形状: {input_tensor.shape}, 数据类型: {input_tensor.dtype}")
+    print(f"Input tensor shape: {input_tensor.shape}, dtype: {input_tensor.dtype}")
     input_tensor = input_tensor.to(device)
 
 
     model = BaselineModel()
-    # 将模型移动到指定设备
+    
     model.to(device)
 
-    # 前向传播
+    
     import time
     start_time = time.time()
     output = model(input_tensor)
     end_time = time.time()
-    print(f"前向传播完成，用时: {end_time - start_time:.2f}s")
+    print(f"Forward pass complete; elapsed time: {end_time - start_time:.2f}s")
 
     
-    # 打印模型参数统计信息
+    
     total_params = sum(p.numel() for p in model.parameters())
-    print(f"模型总参数量: {total_params/1e9:.2f}B")
-    print(f"模型参数量(MB): {total_params * 4 / (1024 * 1024):.2f}MB")
+    print(f"Total model parameters: {total_params/1e9:.2f}B")
+    print(f"Model parameter size (MB): {total_params * 4 / (1024 * 1024):.2f}MB")
 
-    # 测试恒等初始化效果
+    
     with torch.no_grad():
         output = model(input_tensor)
-        diff = (output - input_tensor[:,1]).abs().mean()  # 注意输入第0帧 vs 输出
-        print(f"平均绝对误差: {diff.item():.6f}")
+        diff = (output - input_tensor[:,1]).abs().mean()  
+        print(f"Mean absolute error: {diff.item():.6f}")

@@ -81,6 +81,31 @@ Each file must have shape `(69, 180, 360)` and contain physical values, not
 normalized values. `inference.py` normalizes the input with `statistics.json`,
 then denormalizes the forecast before computing RMSE.
 
+## Raw ERA5 Data Sources
+
+The prepared `.npy` files are derived from the official Copernicus Climate Data
+Store ERA5 reanalysis products:
+
+| ERA5 product | CDS dataset | Variables used |
+|--------------|-------------|----------------|
+| Pressure-level variables | [ERA5 hourly data on pressure levels from 1940 to present](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels) | `z`, `r`, `t`, `u`, `v` on 13 pressure levels |
+| Single-level variables | [ERA5 hourly data on single levels from 1940 to present](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels) | `u10`, `v10`, `t2m`, `msl` |
+
+The repository does not include a CDS downloader. Download raw ERA5 data from
+CDS or with the CDS API, then arrange NetCDF files in this layout before
+running the preprocessing script:
+
+```text
+{YANTIAN_ERA5_NC_ROOT}/YYYY/YYYYMMDD/
+|-- ERA5_Global_LM_Pressure_YYYYMMDDHH.nc
+`-- ERA5_Global_LM_Single_YYYYMMDDHH.nc
+```
+
+`training/data_process/data_Global_LM-1_norm.py` reads these NetCDF files,
+extracts the YanTian 69-channel variable order, averages the grid to
+`(180, 360)`, applies channel-wise normalization, and writes
+`ERA5_Global_LM_YYYYMMDDHH.npy` files for training.
+
 ## Variable Order
 
 The 69-channel order is:

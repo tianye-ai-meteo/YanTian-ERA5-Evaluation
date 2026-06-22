@@ -22,6 +22,24 @@ Training scripts expect normalized `.npy` files:
 Each file has shape `(69, 180, 360)` and is already normalized with the
 statistics in `data_process/statistics.json`.
 
+## Raw ERA5 Sources
+
+Normalized training files are generated from two Copernicus Climate Data Store
+ERA5 products:
+
+| ERA5 product | CDS dataset | Variables used |
+|--------------|-------------|----------------|
+| Pressure-level variables | [ERA5 hourly data on pressure levels from 1940 to present](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-pressure-levels) | `z`, `r`, `t`, `u`, `v` |
+| Single-level variables | [ERA5 hourly data on single levels from 1940 to present](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels) | `u10`, `v10`, `t2m`, `msl` |
+
+The preprocessing script expects raw NetCDF files in this layout:
+
+```text
+{YANTIAN_ERA5_NC_ROOT}/YYYY/YYYYMMDD/
+|-- ERA5_Global_LM_Pressure_YYYYMMDDHH.nc
+`-- ERA5_Global_LM_Single_YYYYMMDDHH.nc
+```
+
 ## Data Preparation
 
 ```bash
